@@ -7,7 +7,7 @@ import glob
 from datetime import datetime
 import pandas as pd
 
-PROCESSED_FILES_LOG = 'C:/Users/q1n/Documents/Empatica/processed_files2.txt'
+PROCESSED_FILES_LOG = './processed_files3.txt'
 
 
 def load_processed_files():
@@ -147,6 +147,9 @@ def process_folder(folder_path, output_dir):
     avro_files = glob.glob(os.path.join(folder_path, '**', '*.avro'), recursive=True)
     processed_files = load_processed_files()
 
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+
     if not avro_files:
         print("No Avro files found.")
         return
@@ -166,6 +169,6 @@ def process_folder(folder_path, output_dir):
 
 # Example usage:
 # Replace the paths below with the actual folder containing Avro files and the output folder.
-folder_path = "C:/Users/q1n/Documents/Empatica"
-output_dir = "C:/Users/q1n/Documents/Empatica/Output4"
+folder_path = "./avro"
+output_dir = "./csv"
 process_folder(folder_path, output_dir)
