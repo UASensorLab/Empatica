@@ -4,6 +4,7 @@ import pandas as pd
 import biobss as bio
 import numpy as np
 import matplotlib.pyplot as plt
+import glob
 
 ## Define the location of the eda csv file and the output folder.
 # macOS example:
@@ -79,40 +80,56 @@ def getFeatureWindows(df, window_size, rest_period):
     return feature_windows
 
 ''' Processes an EDA data file with participant_id, unix_timestamp, and eda data to output metrics by windows '''
-def processEDA(folder, output_dir, window_size, rest_period):
+def processEDA(folderpath, output_dir, window_size, rest_period):
     print("Processing EDA data")
-    filepath = os.path.join(folder, 'eda.csv')
 
-    # Check that EDA file exists
-    if os.path.isfile(filepath):
-        eda_df = pd.read_csv(filepath)
-    else:
-        print("EDA file not found")
-        sys.exit()
+    # Find all .csv files containing "eda" (case-insensitive)
+    pattern = os.path.join(folderpath, '**', '*.csv')
+    eda_files = [f for f in glob.glob(pattern, recursive=True) if "eda" in os.path.basename(f).lower()]
+    if eda_files:
+        print("EDA Files Found:", eda_files)
 
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
+    final_df = pd.DataFrame()
     
-    # Set readable timestamp as index
-    eda_df['timestamp'] = pd.to_datetime(eda_df['unix_timestamp'] * 1000)
-    eda_df = eda_df.set_index(['timestamp'])
-    eda_df.index = pd.to_datetime(eda_df.index) 
+    for filepath in eda_files:
+
+        # Check that EDA file exists
+        if os.path.isfile(filepath):
+            eda_df = pd.read_csv(filepath)
+        else:
+            print("EDA file not found")
+            sys.exit()
+
+        # Check that correct columns exist
+        if not {'participant_id', 'unix_timestamp', 'eda'}.issubset(eda_df.columns):
+            print('Error parsing', filepath, ":", eda_df.columns)
+            print('Skipping', filepath)
+            continue
     
-    # Resample EDA data and Phasic (SCR) and Tonic (SCL) components
-    eda_windows = getEDAWindows(eda_df, window_size)
-    feature_windows = getFeatureWindows(eda_df, window_size, rest_period)
+        # Set readable timestamp as index
+        eda_df['timestamp'] = pd.to_datetime(eda_df['unix_timestamp'] * 1000)
+        eda_df = eda_df.set_index(['timestamp'])
+        eda_df.index = pd.to_datetime(eda_df.index) 
+    
+        # Resample EDA data and Phasic (SCR) and Tonic (SCL) components
+        eda_windows = getEDAWindows(eda_df, window_size)
+        feature_windows = getFeatureWindows(eda_df, window_size, rest_period)
 
-    # Join EDA windows and feature windows, drop empty cells
-    eda_windows = eda_windows.merge(feature_windows, on=['participant_id', 'timestamp'])
-    eda_windows = eda_windows.dropna().reset_index().drop(columns=['index'])
+        # Join EDA windows and feature windows, drop empty cells
+        eda_windows = eda_windows.merge(feature_windows, on=['participant_id', 'timestamp'])
 
+        final_df = pd.concat([final_df, eda_windows])
+
+    final_df = final_df.reset_index().drop(columns=['index'])
     # Print the result
-    # print(eda_windows)
+    # print(final_df)
 
     # Output to csv
-    eda_windows.to_csv(os.path.join(output_dir, 'eda_metrics.csv'))
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+    final_df.to_csv(os.path.join(output_dir, 'eda_metrics.csv'))
 
-    print("Output EDA metrics:", os.path.join(output_dir, 'eda_metrics.csv'))
+    print("Outputting EDA metrics:", os.path.join(output_dir, 'eda_metrics.csv'))
 
 
 # def classify_activity(magnitude):
@@ -167,9 +184,9 @@ def processEDA(folder, output_dir, window_size, rest_period):
 
 
 # Path to folder with extracted csv's (should have eda.csv)
-csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica'
+csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
 # Path to output folder
-output_dir = '/Users/maliaedmonds/Documents/SensorLab/empatica_test/1-1-001_metrics'
+output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
 # Window size (e.g. '30s' or '1min')
 window_size = '30s'
 # Rest period (minutes)
