@@ -58,4 +58,4 @@ def getFiles(outputDir='./avro'):
                 print("Skipping", os.path.join(idDir, filename), "(file already exists)")
 
 
-getFiles()
+# getFiles()

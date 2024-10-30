@@ -1,6 +1,7 @@
 from get_bucket_files import getFiles
 from avro_to_csv_with_ID import process_folder
-from eda_metrics import processEDA
+from metric.eda_metrics import processEDA
+from metric.temperature_metrics import processTemperature
 
 AVRO_DIR = "./avro"
 CSV_DIR = "./csv"
@@ -16,7 +17,12 @@ getFiles(AVRO_DIR)
 # If a file has already been processed, the name will be stored in a .txt file and it will not be re-processed
 process_folder(AVRO_DIR, CSV_DIR)
 
-# Process CSV_DIR/eda.csv file to extract EDA, SCR, and SCL metrics 
+# Process all csv files containing "eda" (case-insensitive) in CSV_DIR to extract EDA, SCR, and SCL metrics 
 # If METRICS_DIR does not exist, function will create the directory
 # Creates windows of time period window_size and calculates baseline SCL for first rest_period minutes of data
-processEDA(CSV_DIR, METRICS_DIR, window_size='30s', rest_period=5)
+processEDA(CSV_DIR, METRICS_DIR, window_size='30s', rest_period=5, tags=True)
+
+# Process all csv files containing "temperature" (case-insensitive) in CSV_DIR to extract temperature metrics 
+# If METRICS_DIR does not exist, function will create the directory
+# Creates windows of time period window_size
+processTemperature(CSV_DIR, METRICS_DIR, window_size='30s', tags=True)

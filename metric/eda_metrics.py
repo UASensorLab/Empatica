@@ -35,7 +35,7 @@ def getEDAWindows(df, window_size):
     eda_windows['window_id'] = eda_windows.groupby('participant_id').cumcount() + 1
 
     # Reorder columns to put window ID before timestamp
-    eda_windows = eda_windows[['participant_id', 'window_id', 'timestamp', 'mean_eda', 'min_eda', 'max_eda', 'std_eda']]
+    eda_windows = eda_windows[['participant_id', 'timestamp', 'window_id', 'mean_eda', 'min_eda', 'max_eda', 'std_eda']]
 
     return eda_windows
 
@@ -79,15 +79,38 @@ def getFeatureWindows(df, window_size, rest_period):
 
     return feature_windows
 
-''' Processes an EDA data file with participant_id, unix_timestamp, and eda data to output metrics by windows '''
-def processEDA(folderpath, output_dir, window_size, rest_period):
-    print("Processing EDA data")
+def processTags(folderpath):
+    tags_df = pd.DataFrame()
+    pattern = os.path.join(folderpath, '**', '*.csv')
+    tag_files = [f for f in glob.glob(pattern, recursive=True) if "tag" in os.path.basename(f).lower()]
+    if tag_files:
+        print("Tag Files Found:", tag_files)
+        for filepath in tag_files:
+            # Check that EDA file exists
+            if os.path.isfile(filepath):
+                tags_df = pd.concat([tags_df, pd.read_csv(filepath)])
+            else:
+                print("Tag file not found:", filepath)
+                continue
+    else:
+        print("No Tag files found.")
+        return tags_df
+    tags_df['timestamp'] = pd.to_datetime(tags_df['tags_timestamp'] * 1000)
+    return tags_df
 
+
+''' Processes an EDA data file with participant_id, unix_timestamp, and eda data to output metrics by windows '''
+def processEDA(folderpath, output_dir, window_size, rest_period, tags=False):
+    print("Processing EDA data")
+        
     # Find all .csv files containing "eda" (case-insensitive)
     pattern = os.path.join(folderpath, '**', '*.csv')
     eda_files = [f for f in glob.glob(pattern, recursive=True) if "eda" in os.path.basename(f).lower()]
     if eda_files:
         print("EDA Files Found:", eda_files)
+    else:
+        print("No EDA files found.")
+        sys.exit()
 
     final_df = pd.DataFrame()
     
@@ -97,8 +120,8 @@ def processEDA(folderpath, output_dir, window_size, rest_period):
         if os.path.isfile(filepath):
             eda_df = pd.read_csv(filepath)
         else:
-            print("EDA file not found")
-            sys.exit()
+            print("EDA file not found:", filepath)
+            continue
 
         # Check that correct columns exist
         if not {'participant_id', 'unix_timestamp', 'eda'}.issubset(eda_df.columns):
@@ -121,6 +144,17 @@ def processEDA(folderpath, output_dir, window_size, rest_period):
         final_df = pd.concat([final_df, eda_windows])
 
     final_df = final_df.reset_index().drop(columns=['index'])
+
+    if tags:
+        tags_df = processTags(folderpath)
+        final_df.insert(3, 'tag', False)
+        for _,row in tags_df.iterrows():
+            final_df.loc[
+                (final_df["timestamp"] <= row["timestamp"]) & 
+                (final_df["timestamp"] + pd.Timedelta(window_size) > row["timestamp"]) & 
+                (row['participant_id'] == final_df['participant_id']), "tag"] = True
+
+            
     # Print the result
     # print(final_df)
 
@@ -184,16 +218,16 @@ def processEDA(folderpath, output_dir, window_size, rest_period):
 
 
 # Path to folder with extracted csv's (should have eda.csv)
-csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
-# Path to output folder
-output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
-# Window size (e.g. '30s' or '1min')
-window_size = '30s'
-# Rest period (minutes)
-rest_period = 5
+# csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
+# # Path to output folder
+# output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
+# # Window size (e.g. '30s' or '1min')
+# window_size = '30s'
+# # Rest period (minutes)
+# rest_period = 5
 
-# eda_csv = os.path.join(csv_folder_path, 'eda.csv')
-processEDA(csv_folder_path, output_dir, window_size, rest_period)
+# # eda_csv = os.path.join(csv_folder_path, 'eda.csv')
+# processEDA(csv_folder_path, output_dir, window_size, rest_period)
 
 # acc_csv = os.path.join(csv_folder_path, 'accelerometer.csv')
 # processAcc(acc_csv, output_dir, window_size)

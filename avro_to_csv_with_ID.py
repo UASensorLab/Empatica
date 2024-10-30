@@ -156,7 +156,7 @@ def process_folder(folder_path, output_dir):
 
     for avro_file in avro_files:
         if avro_file in processed_files:
-            print(f"Skipping already procedded file: {avro_file}")
+            print(f"Skipping already processed file: {avro_file}")
             continue
             
         print(f"Processing {avro_file}...")
@@ -169,6 +169,6 @@ def process_folder(folder_path, output_dir):
 
 # Example usage:
 # Replace the paths below with the actual folder containing Avro files and the output folder.
-folder_path = "./avro"
-output_dir = "./csv"
-process_folder(folder_path, output_dir)
+# folder_path = "./avro"
+# output_dir = "./csv"
+# process_folder(folder_path, output_dir)
