@@ -1,5 +1,5 @@
 from get_bucket_files import getFiles
-from avro_to_csv_with_ID import process_folder
+from process_avro.avro_to_csv_with_ID import process_folder
 from metric.eda_metrics import processEDA
 from metric.temperature_metrics import processTemperature
 
