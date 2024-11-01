@@ -1,4 +1,4 @@
 /avro
 /csv
 /metrics
-/__pycache__
+**/__pycache__

@@ -1,7 +1,7 @@
 import os.path
 import sys
 import pandas as pd
-import biobss as bio
+import biobss 
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
@@ -42,13 +42,13 @@ def getEDAWindows(df, window_size):
 ''' Get SCR and SCL metrics by windows of window_size time '''
 def getFeatureWindows(df, window_size, rest_period):
     # Decompose the EDA signal, set timestamp as index
-    eda_decomp = bio.edatools.eda_decompose(df['eda'], 4)
+    eda_decomp = biobss.edatools.eda_decompose(df['eda'], 4)
     eda_decomp['timestamp'] = df.index
     eda_decomp['participant_id'] = np.array(df['participant_id'])
     eda_decomp = eda_decomp.set_index(['timestamp'])
 
     # Get peak details
-    array, info = bio.edatools.eda_detectpeaks(eda_decomp['EDA_Phasic'], 4)
+    array, info = biobss.edatools.eda_detectpeaks(eda_decomp['EDA_Phasic'], 4)
     array['timestamp'] = df.index
     array = array.set_index(['timestamp'])
     array.index = pd.to_datetime(array.index) 
@@ -192,7 +192,7 @@ def processEDA(folderpath, output_dir, window_size, rest_period, tags=False):
 
 #     acc_df = acc_df[(acc_df.index <= '2024-10-05')]
 
-#     acc_df['fmpre'] = bio.imutools.generate_dataset(acc_df['x'],acc_df['y'],acc_df['z'],32,filtering=True,filtering_order='pre',magnitude=True,normalize=False,modify=False)[0]
+#     acc_df['fmpre'] = biobss.imutools.generate_dataset(acc_df['x'],acc_df['y'],acc_df['z'],32,filtering=True,filtering_order='pre',magnitude=True,normalize=False,modify=False)[0]
 #     print(acc_df.head())
     
 #     acc_df = acc_df.resample(window_size, origin='start').agg(mean_fmpre=('fmpre', 'mean'))
