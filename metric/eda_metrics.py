@@ -79,27 +79,61 @@ def getFeatureWindows(df, window_size, rest_period):
 
     return feature_windows
 
+''' Process all "tag" files in folderpath into a single dataframe '''
 def processTags(folderpath):
     tags_df = pd.DataFrame()
+
+    # Get all files in folderpath containing "tag" (case-insensitive)
     pattern = os.path.join(folderpath, '**', '*.csv')
     tag_files = [f for f in glob.glob(pattern, recursive=True) if "tag" in os.path.basename(f).lower()]
+    
+    # Process each tag file found
     if tag_files:
         print("Tag Files Found:", tag_files)
         for filepath in tag_files:
-            # Check that EDA file exists
-            if os.path.isfile(filepath):
-                tags_df = pd.concat([tags_df, pd.read_csv(filepath)])
-            else:
-                print("Tag file not found:", filepath)
+            file_df = pd.read_csv(filepath)
+
+            # Check that correct columns exist
+            if not {'participant_id', 'tags_timestamp'}.issubset(file_df.columns):
+                print('Error parsing', filepath, ":", file_df.columns)
+                print('Skipping', filepath)
                 continue
+
+            # Combine each tag dataframe
+            tags_df = pd.concat([tags_df, file_df])
+    
+    # If no files were found, return and empty dataframe
     else:
         print("No Tag files found.")
         return tags_df
+    
+    # Add readable timestamp
     tags_df['timestamp'] = pd.to_datetime(tags_df['tags_timestamp'] * 1000)
     return tags_df
 
 
-''' Processes an EDA data file with participant_id, unix_timestamp, and eda data to output metrics by windows '''
+def getMetrics(eda_df, window_size, rest_period):
+    # Check that correct columns exist
+        if not {'participant_id', 'unix_timestamp', 'eda'}.issubset(eda_df.columns):
+            print('Error parsing:', eda_df.columns)
+            print('Skipping')
+            return None
+    
+        # Set readable timestamp as index
+        eda_df['timestamp'] = pd.to_datetime(eda_df['unix_timestamp'] * 1000)
+        eda_df = eda_df.set_index(['timestamp'])
+        eda_df.index = pd.to_datetime(eda_df.index) 
+    
+        # Resample EDA data and Phasic (SCR) and Tonic (SCL) components
+        eda_windows = getEDAWindows(eda_df, window_size)
+        feature_windows = getFeatureWindows(eda_df, window_size, rest_period)
+
+        # Join EDA windows and feature windows, drop empty cells
+        eda_windows = eda_windows.merge(feature_windows, on=['participant_id', 'timestamp'])
+
+        return eda_windows
+
+''' Processes EDA data files with participant_id, unix_timestamp, and eda data to output metrics by windows '''
 def processEDA(folderpath, output_dir, window_size, rest_period, tags=False):
     print("Processing EDA data")
         
@@ -123,31 +157,19 @@ def processEDA(folderpath, output_dir, window_size, rest_period, tags=False):
             print("EDA file not found:", filepath)
             continue
 
-        # Check that correct columns exist
-        if not {'participant_id', 'unix_timestamp', 'eda'}.issubset(eda_df.columns):
-            print('Error parsing', filepath, ":", eda_df.columns)
-            print('Skipping', filepath)
-            continue
-    
-        # Set readable timestamp as index
-        eda_df['timestamp'] = pd.to_datetime(eda_df['unix_timestamp'] * 1000)
-        eda_df = eda_df.set_index(['timestamp'])
-        eda_df.index = pd.to_datetime(eda_df.index) 
-    
-        # Resample EDA data and Phasic (SCR) and Tonic (SCL) components
-        eda_windows = getEDAWindows(eda_df, window_size)
-        feature_windows = getFeatureWindows(eda_df, window_size, rest_period)
+        eda_windows = getMetrics(eda_df, window_size, rest_period)
 
-        # Join EDA windows and feature windows, drop empty cells
-        eda_windows = eda_windows.merge(feature_windows, on=['participant_id', 'timestamp'])
+        if eda_windows is None:
+            continue
 
         final_df = pd.concat([final_df, eda_windows])
 
     final_df = final_df.reset_index().drop(columns=['index'])
 
+    # If tags is enabled, add boolean tags column from tags files
     if tags:
         tags_df = processTags(folderpath)
-        final_df.insert(3, 'tag', False)
+        final_df.insert(3, 'tag', "")
         for _,row in tags_df.iterrows():
             final_df.loc[
                 (final_df["timestamp"] <= row["timestamp"]) & 
@@ -165,54 +187,6 @@ def processEDA(folderpath, output_dir, window_size, rest_period, tags=False):
 
     print("Outputting EDA metrics:", os.path.join(output_dir, 'eda_metrics.csv'))
 
-
-# def classify_activity(magnitude):
-#     if magnitude < 0.1:
-#         return 1
-#     else:
-#         return 2
-#     # elif magnitude < 0.3:
-#     #     return 3
-#     # else:
-#     #     return 4
-
-# ## NOT COMPLETE
-# def processAcc(filepath, output_dir, window_size):
-#     # Check that ACC file exists
-#     if os.path.isfile(filepath):
-#         acc_df = pd.read_csv(filepath)
-#     else:
-#         print("ACC file not found")
-#         sys.exit()
-
-#     # Set readable timestamp as index
-#     acc_df['timestamp'] = pd.to_datetime(acc_df['unix_timestamp'] * 1000)
-#     acc_df = acc_df.set_index(['timestamp'])
-#     acc_df.index = pd.to_datetime(acc_df.index) 
-
-#     acc_df = acc_df[(acc_df.index <= '2024-10-05')]
-
-#     acc_df['fmpre'] = biobss.imutools.generate_dataset(acc_df['x'],acc_df['y'],acc_df['z'],32,filtering=True,filtering_order='pre',magnitude=True,normalize=False,modify=False)[0]
-#     print(acc_df.head())
-    
-#     acc_df = acc_df.resample(window_size, origin='start').agg(mean_fmpre=('fmpre', 'mean'))
-#     acc_df['activity_level'] = acc_df['mean_fmpre'].apply(classify_activity)
-  
-#     acc_df = acc_df.dropna()
-
-#     plt.figure(figsize=(12, 8))
-
-#     # plt.plot(acc_df.index, acc_df['mean_fmpre'], label='ACC')
-#     plt.plot(acc_df.index, acc_df['activity_level'], label="Activity")
-#     plt.title('ACC')
-#     plt.grid(True)
-
-#     plt.show()
-
-#     print(acc_df)
-#     # print(acc_df['mean_magnitude'].max(), acc_df['mean_magnitude'].min())
-
-#     acc_df.to_csv(os.path.join(output_dir, 'acc_metrics.csv'))
 
 
 

@@ -12,25 +12,60 @@ import glob
 # csv_folder_path = "C:/Data/Csv/"
 # output_dir = "C:/Data/Output/"
 
+''' Process all "tag" files in folderpath into a single dataframe '''
 def processTags(folderpath):
     tags_df = pd.DataFrame()
+
+    # Get all files in folderpath containing "tag" (case-insensitive)
     pattern = os.path.join(folderpath, '**', '*.csv')
     tag_files = [f for f in glob.glob(pattern, recursive=True) if "tag" in os.path.basename(f).lower()]
+    
+    # Process each tag file found
     if tag_files:
         print("Tag Files Found:", tag_files)
         for filepath in tag_files:
-            # Check that EDA file exists
-            if os.path.isfile(filepath):
-                tags_df = pd.concat([tags_df, pd.read_csv(filepath)])
-            else:
-                print("Tag file not found:", filepath)
+            file_df = pd.read_csv(filepath)
+
+            # Check that correct columns exist
+            if not {'participant_id', 'tags_timestamp'}.issubset(file_df.columns):
+                print('Error parsing', filepath, ":", file_df.columns)
+                print('Skipping', filepath)
                 continue
+
+            # Combine each tag dataframe
+            tags_df = pd.concat([tags_df, file_df])
+    
+    # If no files were found, return and empty dataframe
     else:
         print("No Tag files found.")
         return tags_df
+    
+    # Add readable timestamp
     tags_df['timestamp'] = pd.to_datetime(tags_df['tags_timestamp'] * 1000)
     return tags_df
 
+def getMetrics(temperature_df, window_size):
+    # Check that correct columns exist
+    if not {'participant_id', 'unix_timestamp', 'temperature'}.issubset(temperature_df.columns):
+        print('Error parsing:', temperature_df.columns)
+        print('Skipping')
+        return None
+        
+    # Set readable timestamp as index
+    temperature_df['timestamp'] = pd.to_datetime(temperature_df['unix_timestamp'] * 1000)
+    temperature_df = temperature_df.set_index(['timestamp'])
+    temperature_df.index = pd.to_datetime(temperature_df.index) 
+
+    # Divide data into windows (30s), get metrics for temperature
+    temperature_df = temperature_df.groupby('participant_id').resample(window_size, origin='start').agg(
+                                    mean_temp=('temperature', 'mean'), 
+                                    max_temp=('temperature', 'max'),
+                                    min_temp=('temperature', 'min'),
+                                    std_temp=('temperature', 'std'))
+        
+    return temperature_df
+
+''' Processes temperature data files with participant_id, unix_timestamp, and temperature data to output metrics by windows '''
 def processTemperature(folderpath, output_dir, window_size='30s', tags=False):
     print("Processing Temperature data")
 
@@ -54,23 +89,11 @@ def processTemperature(folderpath, output_dir, window_size='30s', tags=False):
             print("Temperature file not:", filepath)
             continue
 
-        # Check that correct columns exist
-        if not {'participant_id', 'unix_timestamp', 'temperature'}.issubset(temperature_df.columns):
-            print('Error parsing', filepath, ":", temperature_df.columns)
-            print('Skipping', filepath)
+        temperature_df = getMetrics(temperature_df, window_size)
+
+        if temperature_df is None:
             continue
         
-        # Set readable timestamp as index
-        temperature_df['timestamp'] = pd.to_datetime(temperature_df['unix_timestamp'] * 1000)
-        temperature_df = temperature_df.set_index(['timestamp'])
-        temperature_df.index = pd.to_datetime(temperature_df.index) 
-
-        # Divide data into windows (30s), get metrics for temperature
-        temperature_df = temperature_df.groupby('participant_id').resample(window_size, origin='start').agg(
-                                    mean_temp=('temperature', 'mean'), 
-                                    max_temp=('temperature', 'max'),
-                                    min_temp=('temperature', 'min'),
-                                    std_temp=('temperature', 'std'))
         final_df = pd.concat([final_df, temperature_df])
     
     final_df.insert(0, 'window_id', final_df.groupby('participant_id').cumcount() + 1)
@@ -78,9 +101,10 @@ def processTemperature(folderpath, output_dir, window_size='30s', tags=False):
 
     final_df = final_df.dropna().reset_index()
 
+    # If tags is enabled, add boolean tags column from tags files
     if tags:
         tags_df = processTags(folderpath)
-        final_df.insert(3, 'tag', False)
+        final_df.insert(3, 'tag', "")
         for _,row in tags_df.iterrows():
             final_df.loc[
                 (final_df["timestamp"] <= row["timestamp"]) & 

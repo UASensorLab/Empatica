@@ -2,6 +2,7 @@ import os
 import glob
 import sys
 import pandas as pd
+from metric import eda_metrics, bvp_metrics, temperature_metrics
 
 ''' Process all "tag" files in folderpath into a single dataframe '''
 def processTags(folderpath):
@@ -73,7 +74,7 @@ def processMetric(folderpath, metric):
     return met_df
 
 ''' Print each metric in metrics list (default 'eda') for timeframe seconds before and after each tag in csv_folderpath '''
-def getTagData(csv_folderpath, timeframe, metrics=['eda']):
+def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1):
 
     # Get all tags in csv_folderpath
     tags_df = processTags(csv_folderpath)
@@ -83,6 +84,9 @@ def getTagData(csv_folderpath, timeframe, metrics=['eda']):
     for metric in metrics:
         met_df = processMetric(csv_folderpath, metric)
         metric_dfs.update({metric: met_df})
+
+    final_df = pd.DataFrame()
+    calc_df = pd.DataFrame()
 
     # Print metrics for each tag
     for _, row in tags_df.iterrows():
@@ -104,17 +108,32 @@ def getTagData(csv_folderpath, timeframe, metrics=['eda']):
             # Print data timeframe seconds before and after tag (for respective participant id)
             else:
                 tag_window = met_df[(met_df['participant_id'] == id)
-                            & (met_df['timestamp'] >= (time - pd.Timedelta(seconds=timeframe)))
-                            & (met_df['timestamp'] <= (time + pd.Timedelta(seconds=timeframe)))]
+                            & (met_df['timestamp'] >= (time - pd.Timedelta(seconds=(timeframe * windows))))
+                            & (met_df['timestamp'] <= (time + pd.Timedelta(seconds=(timeframe * windows))))]
                 # Check that data matches tag
                 if tag_window.empty:
                     print(key, "data does not match tag.")
                 else:
                     print(tag_window)
+                    tag_window.insert(1, 'tag_timestamp', time)
+                    tag_window.insert(2, 'metric', key)
+                    final_df = pd.concat([final_df, tag_window])
+                    if key == 'eda':
+                        tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's', 1)
+                    elif key == 'temperature':
+                        tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's')
+                    elif key == 'bvp':
+                        tag_calc = bvp_metrics.getMetrics(tag_window, str(timeframe) + 's')
+                    else:
+                        tag_calc = pd.DataFrame()
+                    calc_df = pd.concat([calc_df, tag_calc])
     print()
+    final_df.reset_index().to_csv(os.path.join(output_dir, 'tag_data.csv'))
+    calc_df.reset_index().to_csv(os.path.join(output_dir, 'tag_data_calc.csv'))
             
 
 csv_folderpath = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
+output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/tag_data'
 timeframe = 30
 
-getTagData(csv_folderpath, timeframe, metrics=['eda', 'temperature', 'bvp', 'pulse'])
+getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda', 'temperature', 'bvp', 'pulse'], windows=5)
