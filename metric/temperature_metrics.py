@@ -53,15 +53,17 @@ def getMetrics(temperature_df, window_size):
         
     # Set readable timestamp as index
     temperature_df['timestamp'] = pd.to_datetime(temperature_df['unix_timestamp'] * 1000)
-    temperature_df = temperature_df.set_index(['timestamp'])
+    temperature_df = temperature_df.set_index('timestamp')
     temperature_df.index = pd.to_datetime(temperature_df.index) 
 
     # Divide data into windows (30s), get metrics for temperature
-    temperature_df = temperature_df.groupby('participant_id').resample(window_size, origin='start').agg(
+    temperature_df = temperature_df.groupby('participant_id').resample(window_size, label='left', origin='start').agg(
                                     mean_temp=('temperature', 'mean'), 
                                     max_temp=('temperature', 'max'),
                                     min_temp=('temperature', 'min'),
-                                    std_temp=('temperature', 'std'))
+                                    std_temp=('temperature', 'std')).dropna().reset_index()
+    
+    temperature_df.insert(2, 'window_id', temperature_df.groupby('participant_id').cumcount() + 1)
         
     return temperature_df
 
@@ -96,10 +98,10 @@ def processTemperature(folderpath, output_dir, window_size='30s', tags=False):
         
         final_df = pd.concat([final_df, temperature_df])
     
-    final_df.insert(0, 'window_id', final_df.groupby('participant_id').cumcount() + 1)
+    final_df['window_id'] = final_df.groupby('participant_id').cumcount() + 1
 
 
-    final_df = final_df.dropna().reset_index()
+    final_df = final_df.dropna().reset_index().drop(columns=['index'])
 
     # If tags is enabled, add boolean tags column from tags files
     if tags:
@@ -118,6 +120,6 @@ def processTemperature(folderpath, output_dir, window_size='30s', tags=False):
 
 
 
-# csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/1-1-001_csv'
-# output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/1-1-001_metrics'
-# processTemperature(csv_folder_path, output_dir, window_size='30s')
+csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
+output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
+processTemperature(csv_folder_path, output_dir, window_size='30s')

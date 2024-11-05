@@ -5,6 +5,7 @@ import sys
 import biobss
 import numpy as np
 import traceback
+import warnings
 
 def calculateHRV(bvp_segment, window_size, mets):
     # Compute HRV metrics using the bvp_segment
@@ -49,38 +50,39 @@ def calculateResp(bvp):
     print(info)
 
 def getMetrics(bvp_df, window_size, metrics=('hrv_mean_hr', 'hrv_min_hr', 'hrv_max_hr', 'hrv_std_hr', 'hrv_mean_nni')):
+    warnings.filterwarnings('ignore')
+
     # Check that correct columns exist
-        if not {'participant_id', 'unix_timestamp', 'bvp'}.issubset(bvp_df.columns):
-            print('Error parsing:', bvp_df.columns)
-            print('Skipping')
-            return None
+    if not {'participant_id', 'unix_timestamp', 'bvp'}.issubset(bvp_df.columns):
+        print('Error parsing:', bvp_df.columns)
+        print('Skipping')
+        return None
 
-        # Set readable timestamp as index
-        bvp_df['timestamp'] = pd.to_datetime(bvp_df['unix_timestamp'] * 1000)
-        bvp_df = bvp_df.set_index(['timestamp'])
-        bvp_df.index = pd.to_datetime(bvp_df.index)
+    # Set readable timestamp as index
+    bvp_df['timestamp'] = pd.to_datetime(bvp_df['unix_timestamp'] * 1000)
+    bvp_df = bvp_df.set_index(['timestamp'])
+    bvp_df.index = pd.to_datetime(bvp_df.index)
 
-        bvp_df = bvp_df.dropna()
-        # bvp_df = bvp_df[bvp_df.index <= '10-05-2024']
+    bvp_df = bvp_df.dropna()
 
-        hrv_mets = (
-            bvp_df.groupby('participant_id') 
-            .resample(window_size, origin='start') 
-            .apply(lambda x: calculateHRV(np.asarray(x['bvp']), window_size, metrics)) 
-            .dropna()
-            .reset_index(drop=False) 
-        )
+    hrv_mets = (
+        bvp_df.groupby('participant_id') 
+        .resample(window_size, label='left', origin='start') 
+        .apply(lambda x: calculateHRV(np.asarray(x['bvp']), window_size, metrics)) 
+        .dropna()
+        .reset_index(drop=False) 
+    )
 
-        bvp_mets = bvp_df.groupby('participant_id').resample(window_size, origin='start').agg(
+    bvp_mets = bvp_df.groupby('participant_id').resample(window_size, label='left', origin='start').agg(
                                 mean_bvp=('bvp', 'mean'), 
                                 min_bvp=('bvp', 'min'),
                                 max_bvp=('bvp', 'max'),
                                 std_bvp=('bvp', 'std')).dropna().reset_index()
-        bvp_mets.insert(2, 'window_id', bvp_mets.groupby('participant_id').cumcount() + 1)
+    bvp_mets.insert(2, 'window_id', bvp_mets.groupby('participant_id').cumcount() + 1)
         
-        bvp_windows = bvp_mets.merge(hrv_mets, on=['participant_id', 'timestamp'])
+    bvp_windows = bvp_mets.merge(hrv_mets, on=['participant_id', 'timestamp'])
 
-        return bvp_windows
+    return bvp_windows
 
 def processBVP(folderpath, output_dir, window_size, metrics):
     print("Processing BVP data")
@@ -118,4 +120,4 @@ csv_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
 output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
 mets = ('hrv_mean_hr', 'hrv_min_hr', 'hrv_max_hr', 'hrv_std_hr', 'hrv_mean_nni')
 
-processBVP(csv_path, output_dir, '1min', mets)
+# processBVP(csv_path, output_dir, '1min', mets)

@@ -2,6 +2,7 @@ import os
 import glob
 import sys
 import pandas as pd
+import numpy as np
 from metric import eda_metrics, bvp_metrics, temperature_metrics
 
 ''' Process all "tag" files in folderpath into a single dataframe '''
@@ -114,22 +115,29 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
                 if tag_window.empty:
                     print(key, "data does not match tag.")
                 else:
-                    print(tag_window)
                     tag_window.insert(1, 'tag_timestamp', time)
                     tag_window.insert(2, 'metric', key)
+                    tag_window.insert(3, 'status', np.where(tag_window['timestamp'] < time, 'Pre', 'Post'))
+                    print(tag_window)
                     final_df = pd.concat([final_df, tag_window])
                     if key == 'eda':
                         tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's', 1)
                     elif key == 'temperature':
-                        tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's')
+                        tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's').reset_index()
                     elif key == 'bvp':
                         tag_calc = bvp_metrics.getMetrics(tag_window, str(timeframe) + 's')
                     else:
                         tag_calc = pd.DataFrame()
+                    tag_calc.insert(3, 'status', np.where(tag_calc['timestamp'] < time, 'Pre', 'Post'))
+                    tag_calc.loc[
+                        (tag_calc["timestamp"] <= time) & 
+                        (tag_calc["timestamp"] + pd.Timedelta(str(timeframe) + 's') > time) & 
+                        (id == tag_calc['participant_id']), "status"] = 'Tagged'
                     calc_df = pd.concat([calc_df, tag_calc])
     print()
-    final_df.reset_index().to_csv(os.path.join(output_dir, 'tag_data.csv'))
-    calc_df.reset_index().to_csv(os.path.join(output_dir, 'tag_data_calc.csv'))
+    final_df.reset_index().drop(columns=['index']).to_csv(os.path.join(output_dir, 'tag_data.csv'))
+
+    calc_df.reset_index().drop(columns=['level_0']).to_csv(os.path.join(output_dir, 'tag_data_calc.csv'))
             
 
 csv_folderpath = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'

@@ -25,7 +25,7 @@ import glob
 ''' Get basic EDA metrics by windows of window_size time '''
 def getEDAWindows(df, window_size):
     # Divide data into windows (e.g. 30s), get metrics for eda
-    eda_windows = df.groupby('participant_id').resample(window_size, origin='start').agg(
+    eda_windows = df.groupby('participant_id').resample(window_size, label='left', origin='start').agg(
                                 mean_eda=('eda', 'mean'), 
                                 min_eda=('eda', 'min'),
                                 max_eda=('eda', 'max'),
@@ -63,7 +63,7 @@ def getFeatureWindows(df, window_size, rest_period):
     ).reset_index(name='scl_baseline')
 
     # Divide into windows, get metrics for SCR and SCL
-    feature_windows = eda_decomp.groupby('participant_id').resample(window_size, origin='start').agg(
+    feature_windows = eda_decomp.groupby('participant_id').resample(window_size, label='left', origin='start').agg(
                                 mean_scr=('EDA_Phasic', 'mean'),
                                 min_scr=('EDA_Phasic', 'min'),
                                 max_scr=('EDA_Phasic', 'max'),
@@ -120,7 +120,7 @@ def getMetrics(eda_df, window_size, rest_period):
             return None
     
         # Set readable timestamp as index
-        eda_df['timestamp'] = pd.to_datetime(eda_df['unix_timestamp'] * 1000)
+        eda_df['timestamp'] = pd.to_datetime(eda_df.loc[:,'unix_timestamp'] * 1000)
         eda_df = eda_df.set_index(['timestamp'])
         eda_df.index = pd.to_datetime(eda_df.index) 
     
