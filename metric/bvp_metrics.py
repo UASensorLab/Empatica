@@ -27,7 +27,7 @@ def calculateHRV(bvp_segment, window_size, mets):
 
         # Calculate hrv metrics for the given window
         hrv_features = biobss.hrvtools.get_hrv_features(sampling_rate=64, signal_length=size, input_type='peaks', peaks_locs=locs_peaks)
-        
+
         # Return dictionary of metrics listed in 'mets'
         return pd.Series({key: hrv_features[key] for key in mets})
     
@@ -109,13 +109,13 @@ def getMetrics(bvp_df, window_size, metrics=('hrv_mean_hr', 'hrv_min_hr', 'hrv_m
     )
 
     # Calculate respiratory metrics by windows
-    resp_mets = (
-        bvp_df.groupby('participant_id') 
-        .resample(window_size, label='left', origin='start') 
-        .apply(lambda x: calculateResp(np.asarray(x['bvp']))) 
-        .dropna()
-        .reset_index(drop=False) 
-    )
+    # resp_mets = (
+    #     bvp_df.groupby('participant_id') 
+    #     .resample(window_size, label='left', origin='start') 
+    #     .apply(lambda x: calculateResp(np.asarray(x['bvp']))) 
+    #     .dropna()
+    #     .reset_index(drop=False) 
+    # )
 
     # Calculate BVP metrics by windows
     bvp_mets = bvp_df.groupby('participant_id').resample(window_size, label='left', origin='start').agg(
@@ -127,7 +127,7 @@ def getMetrics(bvp_df, window_size, metrics=('hrv_mean_hr', 'hrv_min_hr', 'hrv_m
     
     # Merge all metric dataframes
     bvp_windows = bvp_mets.merge(hrv_mets, on=['participant_id', 'timestamp'])
-    bvp_windows = bvp_windows.merge(resp_mets, on=['participant_id', 'timestamp'])
+    # bvp_windows = bvp_windows.merge(resp_mets, on=['participant_id', 'timestamp'])
 
     return bvp_windows
 
@@ -167,4 +167,4 @@ csv_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
 output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
 mets = ('hrv_mean_hr', 'hrv_min_hr', 'hrv_max_hr', 'hrv_std_hr', 'hrv_mean_nni')
 
-processBVP(csv_path, output_dir, '1min', mets)
+# processBVP(csv_path, output_dir, '1min', mets)

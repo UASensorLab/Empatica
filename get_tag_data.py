@@ -39,6 +39,16 @@ def processTags(folderpath):
 
     return tags_df
 
+def highlight_status(row):
+    if row['status'] == 'Pre':
+        return ['background-color: lightblue'] * len(row)
+    elif row['status'] == 'Tagged':
+        return ['background-color: lightcoral'] * len(row)
+    elif row['status'] == 'Post':
+        return ['background-color: lightgreen'] * len(row)
+    else:
+        return [''] * len(row)
+
 ''' Process each file containing metric name in folderpath into a single dataframe '''
 def processMetric(folderpath, metric):
     print("Processing", metric)
@@ -89,55 +99,71 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
     final_df = pd.DataFrame()
     calc_df = pd.DataFrame()
 
-    # Print metrics for each tag
-    for _, row in tags_df.iterrows():
-        id = row['participant_id']
-        time = row['timestamp']
+    # Print each metric
+    for key in metric_dfs:
+        met_df = metric_dfs[key]
 
-        # Print each metric
-        for key in metric_dfs:
-            met_df = metric_dfs[key]
-            print()
-            print("*******************************************************************************")
-            print(key + " (" + str(time) + ")")
-            print("*******************************************************************************")
+        # If no data was found, print message
+        if met_df is None:
+            print("No", key, "data found.")
 
-            # If no data was found, print message
-            if met_df is None:
-                print("No", key, "data found.")
-
-            # Print data timeframe seconds before and after tag (for respective participant id)
+        # Print data timeframe seconds before and after tag (for respective participant id)
+        else:
+            tag_window = met_df
+            # Check that data matches tag
+            if tag_window.empty:
+                print(key, "data does not match tag.")
             else:
-                tag_window = met_df[(met_df['participant_id'] == id)
-                            & (met_df['timestamp'] >= (time - pd.Timedelta(seconds=(timeframe * windows))))
-                            & (met_df['timestamp'] <= (time + pd.Timedelta(seconds=(timeframe * windows))))]
-                # Check that data matches tag
-                if tag_window.empty:
-                    print(key, "data does not match tag.")
+                if key == 'eda':
+                    tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's', 1)
+                elif key == 'temperature':
+                    tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's').reset_index()
+                elif key == 'bvp':
+                    tag_calc = bvp_metrics.getMetrics(tag_window, str(timeframe) + 's')
                 else:
-                    tag_window.insert(1, 'tag_timestamp', time)
-                    tag_window.insert(2, 'metric', key)
-                    tag_window.insert(3, 'status', np.where(tag_window['timestamp'] < time, 'Pre', 'Post'))
-                    print(tag_window)
-                    final_df = pd.concat([final_df, tag_window])
-                    if key == 'eda':
-                        tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's', 1)
-                    elif key == 'temperature':
-                        tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's').reset_index()
-                    elif key == 'bvp':
-                        tag_calc = bvp_metrics.getMetrics(tag_window, str(timeframe) + 's')
-                    else:
-                        tag_calc = pd.DataFrame()
-                    tag_calc.insert(3, 'status', np.where(tag_calc['timestamp'] < time, 'Pre', 'Post'))
+                    tag_calc = pd.DataFrame()
+                    
+                for _, row in tags_df.iterrows():
+                    id = row['participant_id']
+                    time = row['timestamp']
+
+                    if not {'tag_timestamp', 'metric', 'status'}.issubset(tag_window.columns):
+                        tag_window.insert(1, 'tag_timestamp', time)
+                        tag_window.insert(2, 'metric', key)
+                        tag_window.insert(3, 'status', "")
+                    tag_window.loc[
+                            (tag_window["timestamp"]  >= (time - pd.Timedelta(seconds=(timeframe * windows))))
+                            & (tag_window['timestamp'] < (time))
+                            & (id == tag_window['participant_id']), "status"] = '1'
+                    tag_window.loc[
+                            (tag_window["timestamp"]  <= (time + pd.Timedelta(seconds=(timeframe * windows))))
+                            & (tag_window['timestamp'] > (time))
+                            & (id == tag_window['participant_id']), "status"] = '2'
+
+                    if not {'status'}.issubset(tag_calc.columns):
+                        tag_calc.insert(3, 'status', "")
+                    tag_calc.loc[
+                            (tag_calc["timestamp"]  >= (time - pd.Timedelta(seconds=(timeframe * windows))))
+                            & (tag_calc['timestamp'] < (time))
+                            & (id == tag_calc['participant_id']), "status"] = 'Pre'
+                    tag_calc.loc[
+                            (tag_calc["timestamp"]  <= (time + pd.Timedelta(seconds=(timeframe * windows))))
+                            & (tag_calc['timestamp'] > (time))
+                            & (id == tag_calc['participant_id']), "status"] = 'Post'
                     tag_calc.loc[
                         (tag_calc["timestamp"] <= time) & 
                         (tag_calc["timestamp"] + pd.Timedelta(str(timeframe) + 's') > time) & 
                         (id == tag_calc['participant_id']), "status"] = 'Tagged'
-                    calc_df = pd.concat([calc_df, tag_calc])
-    print()
-    final_df.reset_index().drop(columns=['index']).to_csv(os.path.join(output_dir, 'tag_data.csv'))
+                
 
-    calc_df.reset_index().drop(columns=['level_0']).to_csv(os.path.join(output_dir, 'tag_data_calc.csv'))
+                final_df = pd.concat([final_df, tag_window])
+                calc_df = pd.concat([calc_df, tag_calc])
+    print()
+    # final_df.reset_index().drop(columns=['index']).to_csv(os.path.join(output_dir, 'tag_data.csv'))
+    calc_df = calc_df.groupby(['participant_id', 'window_id']).first().reset_index()
+    styled_df = calc_df.style.apply(highlight_status, axis=1)
+    calc_df.to_csv(os.path.join(output_dir, 'tag_data_calc.csv'))
+    styled_df.to_excel(os.path.join(output_dir,'highlighted_tag_data.xlsx'), engine='openpyxl', index=False)
             
 
 csv_folderpath = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
