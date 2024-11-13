@@ -1,4 +1,5 @@
 /avro
 /csv
 /metrics
+/tag_data
 **/__pycache__

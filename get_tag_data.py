@@ -3,7 +3,7 @@ import glob
 import sys
 import pandas as pd
 import numpy as np
-from metric import eda_metrics, bvp_metrics, temperature_metrics
+from metric import eda_metrics, bvp_metrics, temperature_metrics, step_metrics
 
 ''' Process all "tag" files in folderpath into a single dataframe '''
 def processTags(folderpath):
@@ -99,7 +99,7 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
     final_df = pd.DataFrame()
     calc_df = pd.DataFrame()
 
-    # Print each metric
+    # Iterate through each metric
     for key in metric_dfs:
         met_df = metric_dfs[key]
 
@@ -114,15 +114,20 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
             if tag_window.empty:
                 print(key, "data does not match tag.")
             else:
+
+                # Calculate metrics
                 if key == 'eda':
                     tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's', 1)
                 elif key == 'temperature':
                     tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's').reset_index()
                 elif key == 'bvp':
                     tag_calc = bvp_metrics.getMetrics(tag_window, str(timeframe) + 's')
+                elif key == 'steps':
+                    tag_calc = step_metrics.getMetrics(tag_window, str(timeframe) + 's')
                 else:
                     tag_calc = pd.DataFrame()
-                    
+                
+                # Check each tag for each metric
                 for _, row in tags_df.iterrows():
                     id = row['participant_id']
                     time = row['timestamp']
@@ -168,6 +173,6 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
 
 csv_folderpath = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
 output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/tag_data'
-timeframe = 30
+timeframe = 120
 
-getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda', 'temperature', 'bvp', 'pulse'], windows=5)
+getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda', 'temperature', 'bvp', 'pulse', 'steps'], windows=5)
