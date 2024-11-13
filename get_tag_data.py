@@ -87,6 +87,9 @@ def processMetric(folderpath, metric):
 ''' Print each metric in metrics list (default 'eda') for timeframe seconds before and after each tag in csv_folderpath '''
 def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1):
 
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+
     # Get all tags in csv_folderpath
     tags_df = processTags(csv_folderpath)
 

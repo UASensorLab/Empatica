@@ -49,8 +49,8 @@ def getMetrics(steps_df, window_size):
         steps_df.index = pd.to_datetime(steps_df.index) 
     
         # Resample steps data 
-        steps_windows = steps_df.groupby('participant_id').resample(window_size, label='left', origin='start').agg(
-                                step_count=('steps', 'sum')).dropna().reset_index()
+        steps_windows = steps_df.groupby('participant_id').resample(window_size, label='left', origin='start').sum().dropna().reset_index()
+        steps_windows = steps_windows[steps_windows['unix_timestamp'] != 0]
         
         steps_windows.insert(2, 'window_id', steps_windows.groupby('participant_id').cumcount() + 1)
 
@@ -116,4 +116,4 @@ def processSteps(folderpath, output_dir, window_size, tags=False):
 csv_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
 output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
 
-processSteps(csv_path, output_dir, '1min')
+processSteps(csv_path, output_dir, '30s')
