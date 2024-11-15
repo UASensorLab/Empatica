@@ -36,6 +36,11 @@ def processTags(folderpath):
     
     # Add readable timestamp
     tags_df['timestamp'] = pd.to_datetime(tags_df['tags_timestamp'] * 1000)
+    print(tags_df)
+    tags_df['group'] = (tags_df['timestamp'].diff().dt.total_seconds() > 5 * 60).cumsum()
+    print(tags_df)
+    tags_df = tags_df.groupby('group').first().reset_index(drop=True)
+    print(tags_df)
 
     return tags_df
 
@@ -120,7 +125,7 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
 
                 # Calculate metrics
                 if key == 'eda':
-                    tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's', 1)
+                    tag_calc = eda_metrics.getMetrics(tag_window, str(timeframe) + 's')
                 elif key == 'temperature':
                     tag_calc = temperature_metrics.getMetrics(tag_window, str(timeframe) + 's').reset_index()
                 elif key == 'bvp':

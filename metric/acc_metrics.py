@@ -37,7 +37,7 @@ def processTags(folderpath):
     tags_df['timestamp'] = pd.to_datetime(tags_df['tags_timestamp'] * 1000)
     return tags_df
 
-def calculateAI(accx, accy, accz, window_size):
+def calculateAI(accx, accy, accz, window_size, means):
     if window_size == '30s':
         size = 30
     elif window_size == '1min': 
@@ -45,25 +45,41 @@ def calculateAI(accx, accy, accz, window_size):
     else:
         size = 30
     
+
+    
+    
     try:
-        if accx.size == 0 or accy.size == 0 or accz.size == 0:
+        if accx.size == 0 or accy.size == 0 or accz.size == 0 or means is None:
             return pd.Series({'UFXYZ': np.nan, 'FXYZ': np.nan})
         
+        # print(means[0, :])
+        base_x = means[0]
+        base_y = means[1]
+        base_z = means[2]
+
+        # base_x = 0.05
+        # base_y = 0.05
+        # base_z = 0.05
+
+
         #Filter ACC signal by using predefined filters
         f_accx=biobss.preprocess.filter_signal(sig=accx, sampling_rate=32, signal_type='ACC', method='lowpass')
         f_accy=biobss.preprocess.filter_signal(sig=accy, sampling_rate=32, signal_type='ACC', method='lowpass')
         f_accz=biobss.preprocess.filter_signal(sig=accz, sampling_rate=32, signal_type='ACC', method='lowpass')
 
-        ai = biobss.imutools.calc_activity_index(accx, accy, accz, signal_length=size, sampling_rate=32, metric='AI', baseline_variance=[0.05,0.05,0.05])
+        ai = biobss.imutools.calc_activity_index(accx, accy, accz, signal_length=size, sampling_rate=32, metric='AI', baseline_variance=[base_x,base_y,base_z])
 
         return pd.Series(ai)
 
     except Exception as e:
         print(str(e))
         return pd.Series({'UFXYZ': np.nan, 'FXYZ': np.nan})
+    
+def doNothing():
+    return pd.Series({'UFXYZ': np.nan, 'FXYZ': np.nan})
 
 
-def getMetrics(acc_df, window_size):
+def getMetrics(acc_df, window_size, rest_period=5):
     # Check that correct columns exist
         if not {'participant_id', 'unix_timestamp', 'x', 'y', 'z'}.issubset(acc_df.columns):
             print('Error parsing:', acc_df.columns)
@@ -74,11 +90,24 @@ def getMetrics(acc_df, window_size):
         acc_df['timestamp'] = pd.to_datetime(acc_df.loc[:,'unix_timestamp'] * 1000)
         acc_df = acc_df.set_index(['timestamp'])
         acc_df.index = pd.to_datetime(acc_df.index) 
+
+        # Get average scl for the first rest_period minutes (by participant)
+        baseline = acc_df.groupby('participant_id').apply(
+                lambda group: group[group.index <= (group.index.min() + pd.Timedelta(minutes=rest_period))].mean()
+        )
+
+        print(baseline)
     
         # Resample acc data 
         acc_windows = (acc_df.groupby('participant_id')
                             .resample(window_size, label='left', origin='start')
-                            .apply(lambda x: calculateAI(np.asarray(x['x']), np.asarray(x['y']), np.asarray(x['z']), window_size))
+                            .apply(lambda x: calculateAI(
+                                np.asarray(x['x']), 
+                                np.asarray(x['y']), 
+                                np.asarray(x['z']),
+                                window_size,
+                                means=baseline.loc[x['participant_id'], ['x', 'y', 'z']].values) 
+                                if isinstance(x, pd.DataFrame) else doNothing())
                             .dropna()
                             .reset_index()
         )
@@ -90,7 +119,7 @@ def getMetrics(acc_df, window_size):
         return acc_windows
 
 ''' Processes acc data files with participant_id, unix_timestamp, and acc data to output metrics by windows '''
-def processAcc(folderpath, output_dir, window_size, tags=False):
+def processAcc(folderpath, output_dir, window_size, rest_period=5, tags=False):
     print("Processing acc data")
         
     # Find all .csv files containing "acc" (case-insensitive)
@@ -113,7 +142,7 @@ def processAcc(folderpath, output_dir, window_size, tags=False):
             print("acc file not found:", filepath)
             continue
 
-        acc_windows = getMetrics(acc_df, window_size)
+        acc_windows = getMetrics(acc_df, window_size, rest_period)
 
         if acc_windows is None:
             continue

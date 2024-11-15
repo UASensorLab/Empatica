@@ -40,7 +40,7 @@ def getEDAWindows(df, window_size):
     return eda_windows
 
 ''' Get SCR and SCL metrics by windows of window_size time '''
-def getFeatureWindows(df, window_size, rest_period):
+def getFeatureWindows(df, window_size, rest_period=5):
     # Decompose the EDA signal, set timestamp as index
     eda_decomp = biobss.edatools.eda_decompose(df['eda'], 4)
     eda_decomp['timestamp'] = df.index
@@ -59,7 +59,7 @@ def getFeatureWindows(df, window_size, rest_period):
     # Get average scl for the first rest_period minutes (by participant)
     baseline = (
         eda_decomp.groupby('participant_id')
-        .apply(lambda x: x[x.index <= (x.index[0] + pd.Timedelta(minutes=rest_period))]['EDA_Tonic'].mean())
+        .apply(lambda x: x[x.index <= (x.index.min() + pd.Timedelta(minutes=rest_period))]['EDA_Tonic'].mean())
     ).reset_index(name='scl_baseline')
 
     # Divide into windows, get metrics for SCR and SCL
@@ -112,7 +112,7 @@ def processTags(folderpath):
     return tags_df
 
 
-def getMetrics(eda_df, window_size, rest_period):
+def getMetrics(eda_df, window_size, rest_period=5):
     # Check that correct columns exist
         if not {'participant_id', 'unix_timestamp', 'eda'}.issubset(eda_df.columns):
             print('Error parsing:', eda_df.columns)
@@ -134,7 +134,7 @@ def getMetrics(eda_df, window_size, rest_period):
         return eda_windows
 
 ''' Processes EDA data files with participant_id, unix_timestamp, and eda data to output metrics by windows '''
-def processEDA(folderpath, output_dir, window_size, rest_period, tags=False):
+def processEDA(folderpath, output_dir, window_size, rest_period=5, tags=False):
     print("Processing EDA data")
         
     # Find all .csv files containing "eda" (case-insensitive)
