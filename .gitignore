@@ -1,0 +1,6 @@
+/avro
+/csv
+/metrics
+/tag_data
+**/__pycache__
+**/*.csv
