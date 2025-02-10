@@ -154,19 +154,23 @@ def getTagData(csv_folderpath, output_dir, timeframe, metrics=['eda'], windows=1
                             & (id == tag_window['participant_id']), "status"] = '2'
 
                     if not {'status'}.issubset(tag_calc.columns):
-                        tag_calc.insert(3, 'status', "")
-                    tag_calc.loc[
-                            (tag_calc["timestamp"]  >= (time - pd.Timedelta(seconds=(timeframe * windows))))
-                            & (tag_calc['timestamp'] < (time))
-                            & (id == tag_calc['participant_id']), "status"] = 'Pre'
-                    tag_calc.loc[
-                            (tag_calc["timestamp"]  <= (time + pd.Timedelta(seconds=(timeframe * windows))))
-                            & (tag_calc['timestamp'] > (time))
-                            & (id == tag_calc['participant_id']), "status"] = 'Post'
+                        tag_calc.insert(3, 'status', 0)
+                    # tag_calc.loc[
+                    #         (tag_calc["timestamp"]  >= (time - pd.Timedelta(seconds=(timeframe * windows))))
+                    #         & (tag_calc['timestamp'] < (time))
+                    #         & (id == tag_calc['participant_id']), "status"] = 0
+                    # tag_calc.loc[
+                    #         (tag_calc["timestamp"]  <= (time + pd.Timedelta(seconds=(timeframe * windows))))
+                    #         & (tag_calc['timestamp'] > (time))
+                    #         & (id == tag_calc['participant_id']), "status"] = 0
                     tag_calc.loc[
                         (tag_calc["timestamp"] <= time) & 
                         (tag_calc["timestamp"] + pd.Timedelta(str(timeframe) + 's') > time) & 
-                        (id == tag_calc['participant_id']), "status"] = 'Tagged'
+                        (id == tag_calc['participant_id']), "status"] = 1
+                    # tag_calc.loc[not (
+                    #     (tag_calc["timestamp"] <= time) & 
+                    #     (tag_calc["timestamp"] + pd.Timedelta(str(timeframe) + 's') > time) & 
+                    #     (id == tag_calc['participant_id'])), "status"] = 1
                 
 
                 final_df = pd.concat([final_df, tag_window])

@@ -95,7 +95,7 @@ def getMetrics(bvp_df, window_size, metrics=('hrv_mean_hr', 'hrv_min_hr', 'hrv_m
     bvp_df.index = pd.to_datetime(bvp_df.index)
 
     bvp_df = bvp_df.dropna()
-    bvp_df = bvp_df[bvp_df.index <= "10-05-24"]
+    # bvp_df = bvp_df[bvp_df.index <= "10-05-24"]
 
     # calculateResp(np.asarray(bvp_df['bvp']))
 

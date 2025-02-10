@@ -192,16 +192,16 @@ def processEDA(folderpath, output_dir, window_size, rest_period=5, tags=False):
 
 
 # Path to folder with extracted csv's (should have eda.csv)
-# csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
-# # Path to output folder
-# output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
-# # Window size (e.g. '30s' or '1min')
-# window_size = '30s'
-# # Rest period (minutes)
-# rest_period = 5
+csv_folder_path = '/Users/maliaedmonds/Documents/SensorLab/Empatica/csv'
+# Path to output folder
+output_dir = '/Users/maliaedmonds/Documents/SensorLab/Empatica/metrics'
+# Window size (e.g. '30s' or '1min')
+window_size = '30s'
+# Rest period (minutes)
+rest_period = 5
 
-# # eda_csv = os.path.join(csv_folder_path, 'eda.csv')
-# processEDA(csv_folder_path, output_dir, window_size, rest_period)
+# eda_csv = os.path.join(csv_folder_path, 'eda.csv')
+processEDA(csv_folder_path, output_dir, window_size, rest_period)
 
 # acc_csv = os.path.join(csv_folder_path, 'accelerometer.csv')
 # processAcc(acc_csv, output_dir, window_size)
